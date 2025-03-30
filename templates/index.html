@@ -5,39 +5,107 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>自主AI智能体</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <style>
+        .chat-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .chat-box {
+            height: 500px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin-bottom: 15px;
+            background: #f9f9f9;
+            border-radius: 8px;
+        }
+        .message {
+            margin-bottom: 15px;
+            padding: 10px 15px;
+            border-radius: 18px;
+            max-width: 80%;
+        }
+        .user {
+            background: #e3f2fd;
+            margin-left: auto;
+            border-bottom-right-radius: 5px;
+        }
+        .assistant {
+            background: #f1f1f1;
+            margin-right: auto;
+            border-bottom-left-radius: 5px;
+        }
+        .search-result {
+            border-left: 3px solid #4285f4;
+            padding-left: 10px;
+            margin: 10px 0;
+        }
+        .search-source {
+            font-size: 0.8em;
+            color: #666;
+            font-weight: bold;
+        }
+        .search-title {
+            color: #1a0dab;
+            text-decoration: underline;
+            display: block;
+            margin: 5px 0;
+        }
+        .search-snippet {
+            color: #545454;
+            font-size: 0.9em;
+        }
+        .task-plan {
+            background: #fff8e1;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        .task-item {
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px dashed #ddd;
+        }
+        .input-area {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        #userInput {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            padding: 10px 15px;
+            background: #4285f4;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #3367d6;
+        }
+    </style>
 </head>
 <body>
-    <div class="container">
+    <div class="chat-container">
         <h1>自主AI智能体</h1>
         
-        <div class="chat-container">
-            <div class="chat-box" id="chatBox">
-                <!-- 聊天消息将在这里显示 -->
+        <div class="chat-box" id="chatBox">
+            <div class="message assistant">
+                <p>你好！我是你的AI助手，可以执行任务、搜索信息和制定计划。</p>
+                <p>尝试输入: <code>/goal 学习Python</code> 或 <code>/execute 搜索最新AI新闻</code></p>
             </div>
-            <div class="input-area">
-                <input type="text" id="userInput" placeholder="输入消息或指令 (/goal, /execute, /plan, /reflect)">
-                <button id="sendButton">发送</button>
-                <button id="clearButton">清空对话</button>
-            </div>
-            <div class="status" id="status"></div>
         </div>
         
-        <div class="agent-controls">
-            <h2>智能体控制面板</h2>
-            <div class="control-group">
-                <input type="text" id="goalInput" placeholder="输入新目标">
-                <button id="setGoal">设置目标</button>
-            </div>
-            <div class="control-group">
-                <input type="text" id="taskInput" placeholder="输入执行任务">
-                <button id="executeTask">执行任务</button>
-            </div>
-            <div class="control-group">
-                <input type="text" id="planInput" placeholder="输入规划目标">
-                <button id="generatePlan">生成计划</button>
-            </div>
-            <button id="reflectButton">自我反思</button>
-            <button id="viewMemory">查看记忆</button>
+        <div class="input-area">
+            <input type="text" id="userInput" placeholder="输入消息或指令 (/goal, /execute, /plan, /reflect)">
+            <button id="sendButton">发送</button>
+            <button id="clearButton">清空</button>
         </div>
     </div>
 
@@ -47,86 +115,83 @@
             const userInput = document.getElementById('userInput');
             const sendButton = document.getElementById('sendButton');
             const clearButton = document.getElementById('clearButton');
-            const status = document.getElementById('status');
-            
-            // 控制面板元素
-            const goalInput = document.getElementById('goalInput');
-            const setGoalButton = document.getElementById('setGoal');
-            const taskInput = document.getElementById('taskInput');
-            const executeTaskButton = document.getElementById('executeTask');
-            const planInput = document.getElementById('planInput');
-            const generatePlanButton = document.getElementById('generatePlan');
-            const reflectButton = document.getElementById('reflectButton');
-            const viewMemoryButton = document.getElementById('viewMemory');
 
-            function addMessage(role, content) {
+            function addMessage(role, content, isHtml = false) {
                 const messageDiv = document.createElement('div');
                 messageDiv.className = `message ${role}`;
-                messageDiv.innerHTML = `<p>${content}</p>`;
-                chatBox.appendChild(messageDiv);
-                chatBox.scrollTop = chatBox.scrollHeight;
-            }
-
-            function displayTasks(tasks) {
-                if (!tasks || tasks.length === 0) {
-                    addMessage('assistant', '未能生成有效的任务计划');
-                    return;
+                
+                if (isHtml) {
+                    messageDiv.innerHTML = content;
+                } else {
+                    const p = document.createElement('p');
+                    p.textContent = content;
+                    messageDiv.appendChild(p);
                 }
                 
-                let tasksHtml = '<div class="task-plan"><h3>任务计划:</h3><ol>';
-                tasks.forEach(task => {
-                    tasksHtml += `<li>
-                        <strong>${task.description}</strong>
-                        <p>预期结果: ${task.expected_outcome}</p>
-                        ${task.dependencies ? `<p>依赖: ${task.dependencies.join(', ')}</p>` : ''}
-                        ${task.tools_needed ? `<p>所需工具: ${task.tools_needed.join(', ')}</p>` : ''}
-                    </li>`;
-                });
-                tasksHtml += '</ol></div>';
-                
-                const messageDiv = document.createElement('div');
-                messageDiv.className = 'message assistant';
-                messageDiv.innerHTML = tasksHtml;
                 chatBox.appendChild(messageDiv);
                 chatBox.scrollTop = chatBox.scrollHeight;
             }
 
-            async function sendMessage(message) {
+            function displaySearchResults(results) {
+                let html = '<div class="search-results"><p>🔍 搜索到以下结果:</p>';
+                
+                results.forEach(result => {
+                    html += `
+                    <div class="search-result">
+                        <span class="search-source">${result.source}</span>
+                        <a href="${result.link}" target="_blank" class="search-title">${result.title}</a>
+                        <p class="search-snippet">${result.snippet}</p>
+                    </div>`;
+                });
+                
+                html += '</div>';
+                addMessage('assistant', html, true);
+            }
+
+            function displayTaskPlan(tasks) {
+                let html = '<div class="task-plan"><h3>📋 执行计划</h3>';
+                
+                tasks.forEach(task => {
+                    html += `
+                    <div class="task-item">
+                        <h4>步骤 ${task.step}: ${task.description}</h4>
+                        <p>预期结果: ${task.expected_outcome}</p>
+                        ${task.dependencies && task.dependencies.length ? 
+                            `<p>依赖: ${task.dependencies.join(', ')}</p>` : ''}
+                        ${task.tools_needed && task.tools_needed.length ? 
+                            `<p>工具: ${task.tools_needed.join(', ')}</p>` : ''}
+                    </div>`;
+                });
+                
+                html += '</div>';
+                addMessage('assistant', html, true);
+            }
+
+            async function sendMessage() {
+                const message = userInput.value.trim();
                 if (!message) return;
 
                 addMessage('user', message);
                 userInput.value = '';
-                status.textContent = 'AI正在思考...';
-
+                
                 try {
-                    let response;
+                    const response = await fetch('/chat', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ message })
+                    });
                     
-                    if (message.startsWith('/plan ')) {
-                        const objective = message.substring(6);
-                        response = await fetch('/plan', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify({ objective })
-                        });
-                        const data = await response.json();
-                        displayTasks(data.tasks);
+                    const data = await response.json();
+                    
+                    if (data.type === 'plan') {
+                        displayTaskPlan(data.tasks);
                     } else {
-                        response = await fetch('/chat', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify({ message })
-                        });
-                        const data = await response.json();
                         addMessage('assistant', data.response);
                     }
                 } catch (error) {
-                    addMessage('assistant', '抱歉，发生了错误: ' + error.message);
-                } finally {
-                    status.textContent = '';
+                    addMessage('assistant', '出错: ' + error.message);
                 }
             }
 
@@ -134,48 +199,18 @@
                 try {
                     await fetch('/clear', { method: 'POST' });
                     chatBox.innerHTML = '';
+                    addMessage('assistant', '对话历史已清空');
                 } catch (error) {
-                    console.error('清空对话失败:', error);
+                    console.error('清空失败:', error);
                 }
             }
 
-            async function viewMemory() {
-                try {
-                    const response = await fetch('/memory');
-                    const data = await response.json();
-                    
-                    let memoryHtml = '<div class="memory-view"><h3>智能体记忆:</h3><ul>';
-                    data.memory.forEach((item, index) => {
-                        if (typeof item === 'string') {
-                            memoryHtml += `<li>${item}</li>`;
-                        } else {
-                            memoryHtml += `<li>${JSON.stringify(item)}</li>`;
-                        }
-                    });
-                    memoryHtml += '</ul></div>';
-                    
-                    const messageDiv = document.createElement('div');
-                    messageDiv.className = 'message assistant';
-                    messageDiv.innerHTML = memoryHtml;
-                    chatBox.appendChild(messageDiv);
-                    chatBox.scrollTop = chatBox.scrollHeight;
-                } catch (error) {
-                    addMessage('assistant', '获取记忆失败: ' + error.message);
-                }
-            }
-
-            // 事件监听
-            sendButton.addEventListener('click', () => sendMessage(userInput.value));
+            sendButton.addEventListener('click', sendMessage);
             clearButton.addEventListener('click', clearChat);
-            setGoalButton.addEventListener('click', () => sendMessage(`/goal ${goalInput.value}`));
-            executeTaskButton.addEventListener('click', () => sendMessage(`/execute ${taskInput.value}`));
-            generatePlanButton.addEventListener('click', () => sendMessage(`/plan ${planInput.value}`));
-            reflectButton.addEventListener('click', () => sendMessage('/reflect'));
-            viewMemoryButton.addEventListener('click', viewMemory);
-
+            
             userInput.addEventListener('keypress', function(e) {
                 if (e.key === 'Enter') {
-                    sendMessage(userInput.value);
+                    sendMessage();
                 }
             });
         });
