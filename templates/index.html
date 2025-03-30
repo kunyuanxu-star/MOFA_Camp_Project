@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>自主AI智能体</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>自主AI智能体</h1>
+        
+        <div class="chat-container">
+            <div class="chat-box" id="chatBox">
+                <!-- 聊天消息将在这里显示 -->
+            </div>
+            <div class="input-area">
+                <input type="text" id="userInput" placeholder="输入消息或指令 (/goal, /execute, /plan, /reflect)">
+                <button id="sendButton">发送</button>
+                <button id="clearButton">清空对话</button>
+            </div>
+            <div class="status" id="status"></div>
+        </div>
+        
+        <div class="agent-controls">
+            <h2>智能体控制面板</h2>
+            <div class="control-group">
+                <input type="text" id="goalInput" placeholder="输入新目标">
+                <button id="setGoal">设置目标</button>
+            </div>
+            <div class="control-group">
+                <input type="text" id="taskInput" placeholder="输入执行任务">
+                <button id="executeTask">执行任务</button>
+            </div>
+            <div class="control-group">
+                <input type="text" id="planInput" placeholder="输入规划目标">
+                <button id="generatePlan">生成计划</button>
+            </div>
+            <button id="reflectButton">自我反思</button>
+            <button id="viewMemory">查看记忆</button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const chatBox = document.getElementById('chatBox');
+            const userInput = document.getElementById('userInput');
+            const sendButton = document.getElementById('sendButton');
+            const clearButton = document.getElementById('clearButton');
+            const status = document.getElementById('status');
+            
+            // 控制面板元素
+            const goalInput = document.getElementById('goalInput');
+            const setGoalButton = document.getElementById('setGoal');
+            const taskInput = document.getElementById('taskInput');
+            const executeTaskButton = document.getElementById('executeTask');
+            const planInput = document.getElementById('planInput');
+            const generatePlanButton = document.getElementById('generatePlan');
+            const reflectButton = document.getElementById('reflectButton');
+            const viewMemoryButton = document.getElementById('viewMemory');
+
+            function addMessage(role, content) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message ${role}`;
+                messageDiv.innerHTML = `<p>${content}</p>`;
+                chatBox.appendChild(messageDiv);
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
+
+            function displayTasks(tasks) {
+                if (!tasks || tasks.length === 0) {
+                    addMessage('assistant', '未能生成有效的任务计划');
+                    return;
+                }
+                
+                let tasksHtml = '<div class="task-plan"><h3>任务计划:</h3><ol>';
+                tasks.forEach(task => {
+                    tasksHtml += `<li>
+                        <strong>${task.description}</strong>
+                        <p>预期结果: ${task.expected_outcome}</p>
+                        ${task.dependencies ? `<p>依赖: ${task.dependencies.join(', ')}</p>` : ''}
+                        ${task.tools_needed ? `<p>所需工具: ${task.tools_needed.join(', ')}</p>` : ''}
+                    </li>`;
+                });
+                tasksHtml += '</ol></div>';
+                
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'message assistant';
+                messageDiv.innerHTML = tasksHtml;
+                chatBox.appendChild(messageDiv);
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
+
+            async function sendMessage(message) {
+                if (!message) return;
+
+                addMessage('user', message);
+                userInput.value = '';
+                status.textContent = 'AI正在思考...';
+
+                try {
+                    let response;
+                    
+                    if (message.startsWith('/plan ')) {
+                        const objective = message.substring(6);
+                        response = await fetch('/plan', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ objective })
+                        });
+                        const data = await response.json();
+                        displayTasks(data.tasks);
+                    } else {
+                        response = await fetch('/chat', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ message })
+                        });
+                        const data = await response.json();
+                        addMessage('assistant', data.response);
+                    }
+                } catch (error) {
+                    addMessage('assistant', '抱歉，发生了错误: ' + error.message);
+                } finally {
+                    status.textContent = '';
+                }
+            }
+
+            async function clearChat() {
+                try {
+                    await fetch('/clear', { method: 'POST' });
+                    chatBox.innerHTML = '';
+                } catch (error) {
+                    console.error('清空对话失败:', error);
+                }
+            }
+
+            async function viewMemory() {
+                try {
+                    const response = await fetch('/memory');
+                    const data = await response.json();
+                    
+                    let memoryHtml = '<div class="memory-view"><h3>智能体记忆:</h3><ul>';
+                    data.memory.forEach((item, index) => {
+                        if (typeof item === 'string') {
+                            memoryHtml += `<li>${item}</li>`;
+                        } else {
+                            memoryHtml += `<li>${JSON.stringify(item)}</li>`;
+                        }
+                    });
+                    memoryHtml += '</ul></div>';
+                    
+                    const messageDiv = document.createElement('div');
+                    messageDiv.className = 'message assistant';
+                    messageDiv.innerHTML = memoryHtml;
+                    chatBox.appendChild(messageDiv);
+                    chatBox.scrollTop = chatBox.scrollHeight;
+                } catch (error) {
+                    addMessage('assistant', '获取记忆失败: ' + error.message);
+                }
+            }
+
+            // 事件监听
+            sendButton.addEventListener('click', () => sendMessage(userInput.value));
+            clearButton.addEventListener('click', clearChat);
+            setGoalButton.addEventListener('click', () => sendMessage(`/goal ${goalInput.value}`));
+            executeTaskButton.addEventListener('click', () => sendMessage(`/execute ${taskInput.value}`));
+            generatePlanButton.addEventListener('click', () => sendMessage(`/plan ${planInput.value}`));
+            reflectButton.addEventListener('click', () => sendMessage('/reflect'));
+            viewMemoryButton.addEventListener('click', viewMemory);
+
+            userInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    sendMessage(userInput.value);
+                }
+            });
+        });
+    </script>
+</body>
+</html>
