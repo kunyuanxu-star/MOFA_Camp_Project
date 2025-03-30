@@ -4,74 +4,98 @@ from datetime import datetime
 import os
 import openai
 import asyncio
+from dataclasses import dataclass
 
-class AutonomousAgentCore:
-    def __init__(self, openai_api_key: str, search_apis: Optional[Dict] = None):
-        self.openai_api_key = openai_api_key
-        openai.api_key = openai_api_key
-        self.search_apis = search_apis
+@dataclass
+class AgentConfig:
+    openai_api_key: str
+    search_apis: Optional[Dict] = None
+    enable_meta_search: bool = True
+    cache_search_results: bool = True
+    max_search_results: int = 5
+
+class AutonomousAgent:
+    def __init__(self, config: AgentConfig):
+        """
+        自主智能体核心
+        
+        参数:
+            config: 智能体配置
+        """
+        self.config = config
+        openai.api_key = config.openai_api_key
         self.memory = []
         self.goals = []
-        self.tools = self._initialize_tools()
-        self.current_task = None
         self.learning_data = []
-        self.search_tool = None
+        self.current_task = None
+        self.search_engine = None
+        self.tools = self._initialize_tools()
         
     async def initialize(self):
-        """异步初始化"""
-        if self.search_apis:
-            from search_tools import DistributedSearchTool
-            self.search_tool = DistributedSearchTool(self.search_apis)
-            await self.search_tool.initialize()
-            self.tools['distributed_search'] = self._perform_distributed_search
+        """初始化智能体"""
+        if self.config.search_apis and self.config.enable_meta_search:
+            from search_tools import MetaSearchEngine
+            self.search_engine = MetaSearchEngine(
+                self.config.search_apis,
+                cache_enabled=self.config.cache_search_results
+            )
+            await self.search_engine.initialize()
+            self.tools["meta_search"] = self._perform_meta_search
 
     async def close(self):
         """清理资源"""
-        if self.search_tool:
-            await self.search_tool.close()
+        if self.search_engine:
+            await self.search_engine.close()
 
     def _initialize_tools(self) -> Dict[str, Callable]:
         """初始化工具集"""
-        tools = {
-            'note_taking': self._take_notes,
-            'schedule_reminder': self._schedule_reminder,
-            'plan_generation': self.plan_tasks
+        base_tools = {
+            'take_notes': self._take_notes,
+            'set_reminder': self._set_reminder,
+            'plan_tasks': self.plan_tasks,
+            'reflect': self.reflect
         }
-        return tools
+        return base_tools
 
-    async def _perform_distributed_search(self, query: str, num_results: int = 5) -> str:
-        """执行分布式搜索"""
-        if not self.search_tool:
-            return "搜索功能未初始化"
+    async def _perform_meta_search(self, query: str, num_results: int = None) -> str:
+        """执行元搜索"""
+        if not self.search_engine:
+            return "搜索功能未启用"
             
-        results = await self.search_tool.distributed_search(query, num_results)
-        return self.search_tool.format_results(results)
+        num_results = num_results or self.config.max_search_results
+        results = await self.search_engine.meta_search(query, num_results)
+        return self.search_engine.format_results(results)
 
     def _take_notes(self, content: str) -> str:
         """记录笔记"""
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        note = f"[{timestamp}] {content}"
+        note = {
+            "content": content,
+            "timestamp": datetime.now().isoformat(),
+            "type": "note"
+        }
         self.memory.append(note)
-        return f"📝 已记录笔记: {note}"
+        return f"📝 已记录笔记: {content}"
 
-    def _schedule_reminder(self, time: str, task: str) -> str:
+    def _set_reminder(self, time: str, task: str) -> str:
         """设置提醒"""
         reminder = {
             "time": time,
             "task": task,
-            "created": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
+            "type": "reminder"
         }
         self.memory.append(reminder)
         return f"⏰ 已设置提醒: 在 {time} 执行 {task}"
 
-    def set_goal(self, goal_description: str) -> str:
+    def set_goal(self, goal: str) -> str:
         """设置目标"""
-        self.goals.append({
-            "description": goal_description,
+        goal_entry = {
+            "description": goal,
             "created": datetime.now().isoformat(),
             "status": "active"
-        })
-        return f"🎯 新目标已设定: {goal_description}"
+        }
+        self.goals.append(goal_entry)
+        return f"🎯 新目标已设定: {goal}"
 
     def plan_tasks(self, objective: str) -> List[Dict]:
         """制定任务计划"""
@@ -84,7 +108,7 @@ class AutonomousAgentCore:
 3. 考虑步骤依赖关系
 4. 返回JSON格式
 
-示例格式:
+返回格式:
 {{
     "tasks": [
         {{
@@ -103,11 +127,11 @@ class AutonomousAgentCore:
         except json.JSONDecodeError:
             return []
 
-    async def execute_task(self, task_description: str) -> str:
+    async def execute_task(self, task: str) -> str:
         """执行任务"""
-        self.current_task = task_description
+        self.current_task = task
         prompt = f"""执行以下任务:
-任务: {task_description}
+任务: {task}
 
 可用工具: {list(self.tools.keys())}
 
@@ -132,16 +156,17 @@ class AutonomousAgentCore:
             
             # 处理工具调用
             if execution.get("tool_used"):
-                tool = self.tools.get(execution["tool_used"])
-                if tool:
-                    if execution["tool_used"] == "distributed_search":
-                        args = json.loads(execution.get("arguments", "{}"))
-                        execution["result"] = await tool(args.get("query", ""), args.get("num_results", 3))
+                tool_func = self.tools.get(execution["tool_used"])
+                if tool_func:
+                    args = json.loads(execution.get("arguments", "{}"))
+                    if asyncio.iscoroutinefunction(tool_func):
+                        execution["result"] = await tool_func(**args)
                     else:
-                        execution["result"] = tool(**json.loads(execution.get("arguments", "{}")))
+                        execution["result"] = tool_func(**args)
             
+            # 记录执行历史
             self.learning_data.append({
-                "task": task_description,
+                "task": task,
                 "execution": execution,
                 "timestamp": datetime.now().isoformat()
             })
@@ -150,7 +175,7 @@ class AutonomousAgentCore:
         except Exception as e:
             return f"❌ 任务执行出错: {str(e)}"
 
-    def reflect_and_learn(self) -> str:
+    def reflect(self) -> str:
         """自我反思"""
         if not self.learning_data:
             return "暂无足够的学习数据"
@@ -187,3 +212,12 @@ class AutonomousAgentCore:
             return response.choices[0].message['content']
         except Exception as e:
             return f"⚠️ 语言模型调用出错: {str(e)}"
+
+    def get_status(self) -> Dict:
+        """获取智能体状态"""
+        return {
+            "goals": self.goals,
+            "memory_size": len(self.memory),
+            "learning_count": len(self.learning_data),
+            "current_task": self.current_task
+        }

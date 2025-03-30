@@ -3,38 +3,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>自主AI智能体</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <title>AI智能体 - 元搜索版</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css">
     <style>
-        .chat-container {
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
+        body {
+            background-color: #f8f9fa;
         }
-        .chat-box {
+        .chat-container {
+            max-width: 900px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .chat-header {
+            background: #4285f4;
+            color: white;
+            padding: 15px;
+        }
+        .chat-body {
             height: 500px;
             overflow-y: auto;
-            border: 1px solid #ddd;
             padding: 15px;
-            margin-bottom: 15px;
-            background: #f9f9f9;
-            border-radius: 8px;
         }
         .message {
             margin-bottom: 15px;
-            padding: 10px 15px;
-            border-radius: 18px;
             max-width: 80%;
         }
-        .user {
-            background: #e3f2fd;
+        .user-message {
             margin-left: auto;
-            border-bottom-right-radius: 5px;
+            background: #e3f2fd;
+            border-radius: 18px 18px 0 18px;
+            padding: 10px 15px;
         }
-        .assistant {
-            background: #f1f1f1;
+        .agent-message {
             margin-right: auto;
-            border-bottom-left-radius: 5px;
+            background: #f1f1f1;
+            border-radius: 18px 18px 18px 0;
+            padding: 10px 15px;
         }
         .search-result {
             border-left: 3px solid #4285f4;
@@ -48,7 +54,7 @@
         }
         .search-title {
             color: #1a0dab;
-            text-decoration: underline;
+            text-decoration: none;
             display: block;
             margin: 5px 0;
         }
@@ -56,126 +62,128 @@
             color: #545454;
             font-size: 0.9em;
         }
-        .task-plan {
-            background: #fff8e1;
-            padding: 10px;
-            border-radius: 5px;
-            margin-top: 10px;
-        }
         .task-item {
             margin-bottom: 10px;
-            padding-bottom: 10px;
-            border-bottom: 1px dashed #ddd;
-        }
-        .input-area {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
-        }
-        #userInput {
-            flex: 1;
             padding: 10px;
-            border: 1px solid #ddd;
+            background: #fff8e1;
             border-radius: 5px;
         }
-        button {
-            padding: 10px 15px;
-            background: #4285f4;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
+        .status-badge {
+            font-size: 0.8em;
         }
-        button:hover {
-            background: #3367d6;
+        .command-help {
+            font-size: 0.9em;
+            color: #6c757d;
         }
     </style>
 </head>
 <body>
-    <div class="chat-container">
-        <h1>自主AI智能体</h1>
-        
-        <div class="chat-box" id="chatBox">
-            <div class="message assistant">
-                <p>你好！我是你的AI助手，可以执行任务、搜索信息和制定计划。</p>
-                <p>尝试输入: <code>/goal 学习Python</code> 或 <code>/execute 搜索最新AI新闻</code></p>
+    <div class="container py-4">
+        <div class="chat-container mx-auto">
+            <div class="chat-header">
+                <h4 class="mb-0">AI智能体 (元搜索版)</h4>
+                <div class="d-flex justify-content-between align-items-center mt-2">
+                    <small id="agentStatus" class="status-badge">正在连接...</small>
+                    <button id="clearBtn" class="btn btn-sm btn-light">清空对话</button>
+                </div>
             </div>
-        </div>
-        
-        <div class="input-area">
-            <input type="text" id="userInput" placeholder="输入消息或指令 (/goal, /execute, /plan, /reflect)">
-            <button id="sendButton">发送</button>
-            <button id="clearButton">清空</button>
+            
+            <div class="chat-body" id="chatBody">
+                <div class="agent-message">
+                    <p>你好！我是你的AI助手，具备元搜索能力。</p>
+                    <p class="command-help">
+                        可用命令:<br>
+                        <code>/goal [目标]</code> - 设置目标<br>
+                        <code>/execute [任务]</code> - 执行任务<br>
+                        <code>/plan [目标]</code> - 制定计划<br>
+                        <code>/reflect</code> - 自我反思<br>
+                        <code>/status</code> - 查看状态
+                    </p>
+                </div>
+            </div>
+            
+            <div class="chat-footer p-3 bg-light">
+                <div class="input-group">
+                    <input type="text" id="messageInput" class="form-control" placeholder="输入消息或命令...">
+                    <button id="sendBtn" class="btn btn-primary">发送</button>
+                </div>
+            </div>
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            const chatBox = document.getElementById('chatBox');
-            const userInput = document.getElementById('userInput');
-            const sendButton = document.getElementById('sendButton');
-            const clearButton = document.getElementById('clearButton');
-
+            const chatBody = document.getElementById('chatBody');
+            const messageInput = document.getElementById('messageInput');
+            const sendBtn = document.getElementById('sendBtn');
+            const clearBtn = document.getElementById('clearBtn');
+            const agentStatus = document.getElementById('agentStatus');
+            
+            // 添加消息到聊天界面
             function addMessage(role, content, isHtml = false) {
-                const messageDiv = document.createElement('div');
-                messageDiv.className = `message ${role}`;
+                const msgDiv = document.createElement('div');
+                msgDiv.className = `message ${role}-message`;
                 
                 if (isHtml) {
-                    messageDiv.innerHTML = content;
+                    msgDiv.innerHTML = content;
                 } else {
-                    const p = document.createElement('p');
-                    p.textContent = content;
-                    messageDiv.appendChild(p);
+                    msgDiv.textContent = content;
                 }
                 
-                chatBox.appendChild(messageDiv);
-                chatBox.scrollTop = chatBox.scrollHeight;
+                chatBody.appendChild(msgDiv);
+                chatBody.scrollTop = chatBody.scrollHeight;
             }
-
-            function displaySearchResults(results) {
-                let html = '<div class="search-results"><p>🔍 搜索到以下结果:</p>';
-                
-                results.forEach(result => {
-                    html += `
-                    <div class="search-result">
-                        <span class="search-source">${result.source}</span>
-                        <a href="${result.link}" target="_blank" class="search-title">${result.title}</a>
-                        <p class="search-snippet">${result.snippet}</p>
-                    </div>`;
-                });
-                
-                html += '</div>';
-                addMessage('assistant', html, true);
+            
+            // 显示搜索结果
+            function displaySearchResults(resultsHtml) {
+                const container = document.createElement('div');
+                container.className = 'agent-message';
+                container.innerHTML = resultsHtml;
+                chatBody.appendChild(container);
+                chatBody.scrollTop = chatBody.scrollHeight;
             }
-
+            
+            // 显示任务计划
             function displayTaskPlan(tasks) {
-                let html = '<div class="task-plan"><h3>📋 执行计划</h3>';
+                let html = '<h5>📋 任务计划</h5>';
                 
                 tasks.forEach(task => {
                     html += `
-                    <div class="task-item">
-                        <h4>步骤 ${task.step}: ${task.description}</h4>
-                        <p>预期结果: ${task.expected_outcome}</p>
+                    <div class="task-item mb-2">
+                        <strong>步骤 ${task.step}: ${task.description}</strong>
+                        <p class="mb-1">预期结果: ${task.expected_outcome}</p>
                         ${task.dependencies && task.dependencies.length ? 
-                            `<p>依赖: ${task.dependencies.join(', ')}</p>` : ''}
+                            `<p class="mb-1 small">依赖: ${task.dependencies.join(', ')}</p>` : ''}
                         ${task.tools_needed && task.tools_needed.length ? 
-                            `<p>工具: ${task.tools_needed.join(', ')}</p>` : ''}
+                            `<p class="mb-0 small">工具: ${task.tools_needed.join(', ')}</p>` : ''}
                     </div>`;
                 });
                 
-                html += '</div>';
-                addMessage('assistant', html, true);
+                addMessage('agent', html, true);
             }
-
+            
+            // 显示状态信息
+            function displayStatus(status) {
+                let html = '<h5>🔄 智能体状态</h5>';
+                html += `<p>当前目标: ${status.goals.length ? status.goals[status.goals.length-1].description : '无'}</p>`;
+                html += `<p>记忆条目: ${status.memory_size}</p>`;
+                html += `<p>学习记录: ${status.learning_count}</p>`;
+                html += `<p>当前任务: ${status.current_task || '无'}</p>`;
+                
+                addMessage('agent', html, true);
+            }
+            
+            // 发送消息
             async function sendMessage() {
-                const message = userInput.value.trim();
+                const message = messageInput.value.trim();
                 if (!message) return;
-
+                
                 addMessage('user', message);
-                userInput.value = '';
+                messageInput.value = '';
                 
                 try {
-                    const response = await fetch('/chat', {
+                    const response = await fetch('/api/chat', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -187,32 +195,58 @@
                     
                     if (data.type === 'plan') {
                         displayTaskPlan(data.tasks);
+                    } else if (data.type === 'status') {
+                        displayStatus(data.response);
                     } else {
-                        addMessage('assistant', data.response);
+                        addMessage('agent', data.response);
                     }
+                    
+                    // 更新状态
+                    updateAgentStatus();
                 } catch (error) {
-                    addMessage('assistant', '出错: ' + error.message);
+                    addMessage('agent', `错误: ${error.message}`);
                 }
             }
-
+            
+            // 更新智能体状态
+            async function updateAgentStatus() {
+                try {
+                    const response = await fetch('/api/search/stats');
+                    if (response.ok) {
+                        const stats = await response.json();
+                        let statusText = '就绪';
+                        if (Object.keys(stats).length > 0) {
+                            statusText += ' | 搜索: ' + 
+                                Object.entries(stats).map(([k,v]) => `${k}:${v}`).join(', ');
+                        }
+                        agentStatus.textContent = statusText;
+                    }
+                } catch (error) {
+                    console.error('获取状态失败:', error);
+                }
+            }
+            
+            // 清空对话
             async function clearChat() {
                 try {
-                    await fetch('/clear', { method: 'POST' });
-                    chatBox.innerHTML = '';
-                    addMessage('assistant', '对话历史已清空');
+                    await fetch('/api/clear', { method: 'POST' });
+                    chatBody.innerHTML = '';
+                    addMessage('agent', '对话历史已清空。有什么我可以帮助你的吗？');
+                    updateAgentStatus();
                 } catch (error) {
                     console.error('清空失败:', error);
                 }
             }
-
-            sendButton.addEventListener('click', sendMessage);
-            clearButton.addEventListener('click', clearChat);
             
-            userInput.addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    sendMessage();
-                }
+            // 事件监听
+            sendBtn.addEventListener('click', sendMessage);
+            clearBtn.addEventListener('click', clearChat);
+            messageInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') sendMessage();
             });
+            
+            // 初始状态
+            updateAgentStatus();
         });
     </script>
 </body>

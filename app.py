@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, jsonify
-from agent_core import AutonomousAgentCore
+from agent_core import AutonomousAgent, AgentConfig
 import os
 import asyncio
 from dotenv import load_dotenv
@@ -17,18 +17,29 @@ SEARCH_APIS = {
     "bing": {
         "api_key": os.getenv("BING_API_KEY"),
         "endpoint": "https://api.bing.microsoft.com/v7.0/search"
+    },
+    "duckduckgo": {
+        "api_key": os.getenv("DDG_API_KEY"),
+        "endpoint": "https://api.duckduckgo.com/"
     }
 }
 
 # 初始化智能体
-agent = AutonomousAgentCore(
+agent_config = AgentConfig(
     openai_api_key=os.getenv("OPENAI_API_KEY"),
-    search_apis=SEARCH_APIS
+    search_apis=SEARCH_APIS,
+    enable_meta_search=True,
+    cache_search_results=True,
+    max_search_results=7
 )
 
-@app.before_first_request
-async def initialize():
-    await agent.initialize()
+agent = AutonomousAgent(agent_config)
+
+@app.before_request
+async def before_first_request():
+    if not hasattr(app, 'agent_initialized'):
+        await agent.initialize()
+        app.agent_initialized = True
 
 @app.teardown_appcontext
 async def cleanup(exception=None):
@@ -38,47 +49,63 @@ async def cleanup(exception=None):
 def home():
     return render_template("index.html")
 
-@app.route("/chat", methods=["POST"])
+@app.route("/api/chat", methods=["POST"])
 async def chat():
-    user_input = request.json.get("message", "").strip()
+    """处理聊天消息"""
+    data = request.json
+    message = data.get("message", "").strip()
     
-    if not user_input:
-        return jsonify({"response": "请输入有效消息", "type": "error"})
+    if not message:
+        return jsonify({"error": "Empty message"}), 400
     
-    if user_input.startswith("/goal "):
-        response = agent.set_goal(user_input[6:])
+    # 处理指令
+    if message.startswith("/goal "):
+        response = agent.set_goal(message[6:])
         return jsonify({"response": response, "type": "text"})
-    elif user_input.startswith("/execute "):
-        response = await agent.execute_task(user_input[9:])
+    elif message.startswith("/execute "):
+        response = await agent.execute_task(message[9:])
         return jsonify({"response": response, "type": "text"})
-    elif user_input.startswith("/plan "):
-        tasks = agent.plan_tasks(user_input[6:])
+    elif message.startswith("/plan "):
+        tasks = agent.plan_tasks(message[6:])
         return jsonify({
-            "response": f"已生成执行计划",
-            "tasks": tasks,
-            "type": "plan"
+            "response": "任务计划已生成",
+            "type": "plan",
+            "tasks": tasks
         })
-    elif user_input == "/reflect":
-        response = agent.reflect_and_learn()
+    elif message == "/reflect":
+        response = agent.reflect()
         return jsonify({"response": response, "type": "text"})
+    elif message == "/status":
+        status = agent.get_status()
+        return jsonify({"response": status, "type": "status"})
     else:
-        response = agent._call_llm(user_input)
+        response = agent._call_llm(message)
         return jsonify({"response": response, "type": "text"})
 
-@app.route("/memory", methods=["GET"])
-def get_memory():
+@app.route("/api/memory", methods=["GET"])
+async def get_memory():
+    """获取记忆数据"""
     return jsonify({
-        "memory": agent.memory,
+        "memory": agent.memory[-10:],
         "goals": agent.goals,
-        "learning": agent.learning_data[-5:] if agent.learning_data else []
+        "learning": agent.learning_data[-5:]
     })
 
-@app.route("/clear", methods=["POST"])
-def clear_memory():
+@app.route("/api/search/stats", methods=["GET"])
+async def search_stats():
+    """获取搜索统计"""
+    if agent.search_engine:
+        stats = agent.search_engine.get_sources_statistics()
+        return jsonify(stats)
+    return jsonify({"error": "Search not enabled"}), 400
+
+@app.route("/api/clear", methods=["POST"])
+async def clear_data():
+    """清除数据"""
     agent.memory = []
     agent.goals = []
     agent.learning_data = []
-    return jsonify({"status": "success", "message": "记忆已清空"})
+    return jsonify({"status": "success"})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
