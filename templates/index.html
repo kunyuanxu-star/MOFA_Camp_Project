@@ -3,109 +3,159 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI智能体 - 元搜索版</title>
+    <title>AI智能体 - 深网搜索版</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
     <style>
         body {
             background-color: #f8f9fa;
         }
         .chat-container {
             max-width: 900px;
-            background: white;
-            border-radius: 10px;
-            box-shadow: 0 0 15px rgba(0,0,0,0.1);
-            overflow: hidden;
+            height: 90vh;
+            display: flex;
+            flex-direction: column;
         }
         .chat-header {
-            background: #4285f4;
+            background: linear-gradient(135deg, #4285f4 0%, #34a853 100%);
             color: white;
-            padding: 15px;
         }
         .chat-body {
-            height: 500px;
+            flex: 1;
             overflow-y: auto;
             padding: 15px;
+            background-color: #f8f9fa;
         }
         .message {
+            max-width: 85%;
             margin-bottom: 15px;
-            max-width: 80%;
         }
         .user-message {
             margin-left: auto;
-            background: #e3f2fd;
+            background-color: #e3f2fd;
             border-radius: 18px 18px 0 18px;
-            padding: 10px 15px;
+            padding: 12px 15px;
         }
         .agent-message {
             margin-right: auto;
-            background: #f1f1f1;
+            background-color: white;
             border-radius: 18px 18px 18px 0;
-            padding: 10px 15px;
+            padding: 12px 15px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
         .search-result {
             border-left: 3px solid #4285f4;
-            padding-left: 10px;
-            margin: 10px 0;
-        }
-        .search-source {
-            font-size: 0.8em;
-            color: #666;
-            font-weight: bold;
-        }
-        .search-title {
-            color: #1a0dab;
-            text-decoration: none;
-            display: block;
-            margin: 5px 0;
-        }
-        .search-snippet {
-            color: #545454;
-            font-size: 0.9em;
-        }
-        .task-item {
-            margin-bottom: 10px;
             padding: 10px;
-            background: #fff8e1;
+            margin-bottom: 10px;
+            background-color: white;
             border-radius: 5px;
         }
-        .status-badge {
-            font-size: 0.8em;
+        .deepweb-result {
+            border-left-color: #ffc107;
+            background-color: #fff8e1;
+        }
+        .result-title {
+            color: #1a0dab;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .onion-link {
+            font-family: monospace;
+            color: #d63384;
         }
         .command-help {
-            font-size: 0.9em;
+            font-size: 0.85rem;
             color: #6c757d;
+        }
+        .status-badge {
+            font-size: 0.75rem;
+        }
+        .deepweb-warning {
+            background-color: #fff3cd;
+            border-color: #ffeeba;
+            color: #856404;
+            font-size: 0.8rem;
+        }
+        .typing-indicator {
+            display: inline-block;
+            padding: 10px 15px;
+            background-color: #f1f1f1;
+            border-radius: 18px;
+        }
+        .typing-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #6c757d;
+            margin: 0 2px;
+            animation: typingAnimation 1.4s infinite ease-in-out;
+        }
+        .typing-dot:nth-child(1) { animation-delay: 0s; }
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes typingAnimation {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-5px); }
         }
     </style>
 </head>
 <body>
-    <div class="container py-4">
-        <div class="chat-container mx-auto">
-            <div class="chat-header">
-                <h4 class="mb-0">AI智能体 (元搜索版)</h4>
-                <div class="d-flex justify-content-between align-items-center mt-2">
-                    <small id="agentStatus" class="status-badge">正在连接...</small>
-                    <button id="clearBtn" class="btn btn-sm btn-light">清空对话</button>
+    <div class="container py-3">
+        <div class="chat-container mx-auto shadow rounded-3 overflow-hidden">
+            <div class="chat-header p-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h4 class="mb-0"><i class="bi bi-robot"></i> AI智能体</h4>
+                        <small class="d-block">深网搜索版</small>
+                    </div>
+                    <div id="statusBadge" class="badge bg-light text-dark status-badge">
+                        <i class="bi bi-check-circle-fill text-success"></i> 已连接
+                    </div>
                 </div>
             </div>
             
             <div class="chat-body" id="chatBody">
                 <div class="agent-message">
-                    <p>你好！我是你的AI助手，具备元搜索能力。</p>
-                    <p class="command-help">
-                        可用命令:<br>
-                        <code>/goal [目标]</code> - 设置目标<br>
-                        <code>/execute [任务]</code> - 执行任务<br>
-                        <code>/plan [目标]</code> - 制定计划<br>
-                        <code>/reflect</code> - 自我反思<br>
-                        <code>/status</code> - 查看状态
-                    </p>
+                    <h5><i class="bi bi-stars"></i> 欢迎使用AI智能体</h5>
+                    <p>我是一个具备深网搜索能力的AI助手，可以帮助你查找明网和深网的信息。</p>
+                    
+                    <div class="alert alert-info mt-2">
+                        <h6><i class="bi bi-lightbulb"></i> 可用命令:</h6>
+                        <ul class="mb-1">
+                            <li><code>/search [查询]</code> - 明网搜索</li>
+                            <li><code>/deepsearch [查询]</code> - 深网搜索</li>
+                            <li><code>/goal [目标]</code> - 设置目标</li>
+                            <li><code>/execute [任务]</code> - 执行任务</li>
+                            <li><code>/reflect</code> - 自我反思</li>
+                            <li><code>/capabilities</code> - 查看能力</li>
+                            <li><code>/clear [all|goals|learning]</code> - 清除记忆</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="alert deepweb-warning mt-2">
+                        <small><i class="bi bi-exclamation-triangle"></i> 深网内容需要Tor/I2P浏览器访问，请遵守当地法律法规</small>
+                    </div>
                 </div>
             </div>
             
-            <div class="chat-footer p-3 bg-light">
+            <div class="chat-footer p-3 bg-light border-top">
                 <div class="input-group">
-                    <input type="text" id="messageInput" class="form-control" placeholder="输入消息或命令...">
-                    <button id="sendBtn" class="btn btn-primary">发送</button>
+                    <input type="text" id="messageInput" class="form-control" 
+                           placeholder="输入消息或命令..." autocomplete="off">
+                    <button id="sendButton" class="btn btn-primary">
+                        <i class="bi bi-send"></i> 发送
+                    </button>
+                </div>
+                <div class="d-flex justify-content-between mt-2">
+                    <small class="text-muted">
+                        <span id="searchModeBadge" class="badge bg-info">
+                            <i class="bi bi-globe2"></i> 默认搜索模式: 混合
+                        </span>
+                    </small>
+                    <button id="clearBtn" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-trash"></i> 清空对话
+                    </button>
                 </div>
             </div>
         </div>
@@ -116,113 +166,229 @@
         document.addEventListener('DOMContentLoaded', function() {
             const chatBody = document.getElementById('chatBody');
             const messageInput = document.getElementById('messageInput');
-            const sendBtn = document.getElementById('sendBtn');
+            const sendButton = document.getElementById('sendButton');
             const clearBtn = document.getElementById('clearBtn');
-            const agentStatus = document.getElementById('agentStatus');
+            const statusBadge = document.getElementById('statusBadge');
+            const searchModeBadge = document.getElementById('searchModeBadge');
+            
+            let isAgentTyping = false;
             
             // 添加消息到聊天界面
             function addMessage(role, content, isHtml = false) {
-                const msgDiv = document.createElement('div');
-                msgDiv.className = `message ${role}-message`;
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message ${role}-message`;
                 
                 if (isHtml) {
-                    msgDiv.innerHTML = content;
+                    messageDiv.innerHTML = content;
                 } else {
-                    msgDiv.textContent = content;
+                    messageDiv.textContent = content;
                 }
                 
-                chatBody.appendChild(msgDiv);
+                chatBody.appendChild(messageDiv);
+                scrollToBottom();
+            }
+            
+            // 显示正在输入指示器
+            function showTypingIndicator() {
+                if (isAgentTyping) return;
+                
+                isAgentTyping = true;
+                const typingDiv = document.createElement('div');
+                typingDiv.className = 'message agent-message typing-indicator';
+                typingDiv.id = 'typingIndicator';
+                typingDiv.innerHTML = `
+                    <span class="typing-dot"></span>
+                    <span class="typing-dot"></span>
+                    <span class="typing-dot"></span>
+                `;
+                chatBody.appendChild(typingDiv);
+                scrollToBottom();
+            }
+            
+            // 隐藏正在输入指示器
+            function hideTypingIndicator() {
+                isAgentTyping = false;
+                const typingDiv = document.getElementById('typingIndicator');
+                if (typingDiv) {
+                    typingDiv.remove();
+                }
+            }
+            
+            // 滚动到底部
+            function scrollToBottom() {
                 chatBody.scrollTop = chatBody.scrollHeight;
             }
             
             // 显示搜索结果
-            function displaySearchResults(resultsHtml) {
-                const container = document.createElement('div');
-                container.className = 'agent-message';
-                container.innerHTML = resultsHtml;
-                chatBody.appendChild(container);
-                chatBody.scrollTop = chatBody.scrollHeight;
-            }
-            
-            // 显示任务计划
-            function displayTaskPlan(tasks) {
-                let html = '<h5>📋 任务计划</h5>';
+            function displaySearchResults(data) {
+                let html = `<div class="search-results">`;
                 
-                tasks.forEach(task => {
-                    html += `
-                    <div class="task-item mb-2">
-                        <strong>步骤 ${task.step}: ${task.description}</strong>
-                        <p class="mb-1">预期结果: ${task.expected_outcome}</p>
-                        ${task.dependencies && task.dependencies.length ? 
-                            `<p class="mb-1 small">依赖: ${task.dependencies.join(', ')}</p>` : ''}
-                        ${task.tools_needed && task.tools_needed.length ? 
-                            `<p class="mb-0 small">工具: ${task.tools_needed.join(', ')}</p>` : ''}
-                    </div>`;
-                });
+                // 明网结果
+                if (data.results.surface && data.results.surface.length) {
+                    html += `<h5><i class="bi bi-globe"></i> 明网搜索结果</h5>`;
+                    data.results.surface.forEach((result, i) => {
+                        html += formatResultItem(i + 1, result);
+                    });
+                }
                 
+                // 深网结果
+                if (data.results.deepweb && data.results.deepweb.length) {
+                    html += `<h5 class="mt-3"><i class="bi bi-incognito"></i> 深网搜索结果</h5>
+                            <div class="alert deepweb-warning">
+                                <i class="bi bi-exclamation-triangle"></i> 
+                                ${data.response.includes("注意") ? 
+                                 data.response.match(/注意: ([^<]+)</)[1] : 
+                                 "需要Tor/I2P浏览器访问.onion或.i2p站点"}
+                            </div>`;
+                    data.results.deepweb.forEach((result, i) => {
+                        html += formatResultItem(i + 1, result, true);
+                    });
+                }
+                
+                html += `</div>`;
                 addMessage('agent', html, true);
             }
             
-            // 显示状态信息
-            function displayStatus(status) {
-                let html = '<h5>🔄 智能体状态</h5>';
-                html += `<p>当前目标: ${status.goals.length ? status.goals[status.goals.length-1].description : '无'}</p>`;
-                html += `<p>记忆条目: ${status.memory_size}</p>`;
-                html += `<p>学习记录: ${status.learning_count}</p>`;
-                html += `<p>当前任务: ${status.current_task || '无'}</p>`;
+            // 格式化单个结果项
+            function formatResultItem(index, result, isDeepweb = false) {
+                const sourceBadge = isDeepweb ? 
+                    `<span class="badge bg-warning text-dark">
+                        <i class="bi bi-shield-lock"></i> ${result.source}
+                    </span>` :
+                    `<span class="badge bg-info">
+                        <i class="bi bi-globe"></i> ${result.source}
+                    </span>`;
                 
+                return `
+                <div class="search-result ${isDeepweb ? 'deepweb-result' : ''}">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="fw-bold">${index}.</span>
+                        ${sourceBadge}
+                    </div>
+                    <a href="${result.link}" target="_blank" 
+                       class="result-title d-block mb-1 ${isDeepweb ? 'onion-link' : ''}">
+                        ${result.title}
+                    </a>
+                    ${result.snippet ? `
+                    <div class="result-snippet small text-muted">
+                        ${result.snippet}
+                    </div>` : ''}
+                </div>`;
+            }
+            
+            // 显示智能体能力
+            function displayCapabilities(data) {
+                let html = `<div class="capabilities-info">
+                    <h5><i class="bi bi-cpu"></i> 智能体能力</h5>
+                    <div class="row g-2">`;
+                
+                // 搜索能力
+                html += `<div class="col-md-6">
+                    <div class="card h-100">
+                        <div class="card-header bg-primary text-white">
+                            <i class="bi bi-search"></i> 搜索能力
+                        </div>
+                        <div class="card-body">
+                            <h6>明网引擎:</h6>
+                            <ul class="list-unstyled">
+                                ${data.surface_engines.map(e => `<li><i class="bi bi-check-circle"></i> ${e}</li>`).join('')}
+                            </ul>
+                            
+                            <h6 class="mt-3">深网支持:</h6>
+                            <p>${data.deepweb_enabled ? 
+                                `<span class="badge bg-success"><i class="bi bi-check-circle"></i> 已启用</span>` : 
+                                `<span class="badge bg-secondary"><i class="bi bi-x-circle"></i> 未启用</span>`}
+                            </p>
+                            
+                            ${data.deepweb_enabled ? `
+                            <h6 class="mt-3">深网配置:</h6>
+                            <ul class="list-unstyled">
+                                <li><i class="bi ${data.deepweb_config.tor_proxy ? 'bi-check-circle text-success' : 'bi-x-circle text-secondary'}"></i> Tor代理</li>
+                                <li><i class="bi ${data.deepweb_config.i2p_proxy ? 'bi-check-circle text-success' : 'bi-x-circle text-secondary'}"></i> I2P代理</li>
+                            </ul>` : ''}
+                            
+                            <h6 class="mt-3">默认模式:</h6>
+                            <span class="badge bg-info">${data.default_search_mode}</span>
+                        </div>
+                    </div>
+                </div>`;
+                
+                // 记忆状态
+                html += `<div class="col-md-6">
+                    <div class="card h-100">
+                        <div class="card-header bg-info text-white">
+                            <i class="bi bi-memory"></i> 记忆状态
+                        </div>
+                        <div class="card-body">
+                            <h6>记忆统计:</h6>
+                            <ul class="list-unstyled">
+                                <li><i class="bi bi-bookmark"></i> 目标: ${data.memory_stats.goals}</li>
+                                <li><i class="bi bi-journal-text"></i> 记忆条目: ${data.memory_stats.memory_entries}</li>
+                                <li><i class="bi bi-lightbulb"></i> 学习记录: ${data.memory_stats.learning_records}</li>
+                            </ul>
+                            
+                            <h6 class="mt-3">可用工具:</h6>
+                            <div class="d-flex flex-wrap gap-1">
+                                ${data.tools_available.map(t => `<span class="badge bg-secondary">${t}</span>`).join('')}
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+                
+                html += `</div></div>`;
                 addMessage('agent', html, true);
             }
             
-            // 发送消息
+            // 更新搜索模式显示
+            function updateSearchMode(message) {
+                if (message.startsWith('/deepsearch')) {
+                    searchModeBadge.innerHTML = `<i class="bi bi-incognito"></i> 搜索模式: 仅深网`;
+                    searchModeBadge.className = "badge bg-warning text-dark";
+                } else if (message.startsWith('/search')) {
+                    searchModeBadge.innerHTML = `<i class="bi bi-globe"></i> 搜索模式: 仅明网`;
+                    searchModeBadge.className = "badge bg-success";
+                } else if (message.toLowerCase().includes('深网') || 
+                          /(tor|暗网|onion|\.i2p)/i.test(message)) {
+                    searchModeBadge.innerHTML = `<i class="bi bi-shield-lock"></i> 搜索模式: 自动深网`;
+                    searchModeBadge.className = "badge bg-danger";
+                }
+            }
+            
+            // 发送消息到服务器
             async function sendMessage() {
                 const message = messageInput.value.trim();
                 if (!message) return;
                 
                 addMessage('user', message);
                 messageInput.value = '';
+                showTypingIndicator();
+                updateSearchMode(message);
                 
                 try {
                     const response = await fetch('/api/chat', {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
+                        headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify({ message })
                     });
                     
                     const data = await response.json();
                     
-                    if (data.type === 'plan') {
-                        displayTaskPlan(data.tasks);
-                    } else if (data.type === 'status') {
-                        displayStatus(data.response);
+                    if (data.error) {
+                        addMessage('agent', `错误: ${data.error}`);
+                        return;
+                    }
+                    
+                    if (data.type === 'search_results') {
+                        displaySearchResults(data);
+                    } else if (data.type === 'capabilities') {
+                        displayCapabilities(data.data);
                     } else {
                         addMessage('agent', data.response);
                     }
-                    
-                    // 更新状态
-                    updateAgentStatus();
                 } catch (error) {
-                    addMessage('agent', `错误: ${error.message}`);
-                }
-            }
-            
-            // 更新智能体状态
-            async function updateAgentStatus() {
-                try {
-                    const response = await fetch('/api/search/stats');
-                    if (response.ok) {
-                        const stats = await response.json();
-                        let statusText = '就绪';
-                        if (Object.keys(stats).length > 0) {
-                            statusText += ' | 搜索: ' + 
-                                Object.entries(stats).map(([k,v]) => `${k}:${v}`).join(', ');
-                        }
-                        agentStatus.textContent = statusText;
-                    }
-                } catch (error) {
-                    console.error('获取状态失败:', error);
+                    addMessage('agent', `网络错误: ${error.message}`);
+                } finally {
+                    hideTypingIndicator();
                 }
             }
             
@@ -230,23 +396,41 @@
             async function clearChat() {
                 try {
                     await fetch('/api/clear', { method: 'POST' });
-                    chatBody.innerHTML = '';
-                    addMessage('agent', '对话历史已清空。有什么我可以帮助你的吗？');
-                    updateAgentStatus();
+                    chatBody.innerHTML = `
+                        <div class="agent-message">
+                            <h5><i class="bi bi-stars"></i> 欢迎使用AI智能体</h5>
+                            <p>对话历史已清空，请输入新的查询...</p>
+                        </div>`;
+                    searchModeBadge.innerHTML = `<i class="bi bi-globe2"></i> 默认搜索模式: 混合`;
+                    searchModeBadge.className = "badge bg-info";
                 } catch (error) {
                     console.error('清空失败:', error);
                 }
             }
             
+            // 检查服务器状态
+            async function checkServerStatus() {
+                try {
+                    const response = await fetch('/api/status');
+                    if (response.ok) {
+                        statusBadge.innerHTML = `<i class="bi bi-check-circle-fill text-success"></i> 已连接`;
+                    } else {
+                        statusBadge.innerHTML = `<i class="bi bi-exclamation-triangle-fill text-warning"></i> 连接问题`;
+                    }
+                } catch (error) {
+                    statusBadge.innerHTML = `<i class="bi bi-x-circle-fill text-danger"></i> 连接失败`;
+                }
+            }
+            
             // 事件监听
-            sendBtn.addEventListener('click', sendMessage);
+            sendButton.addEventListener('click', sendMessage);
             clearBtn.addEventListener('click', clearChat);
             messageInput.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') sendMessage();
             });
             
-            // 初始状态
-            updateAgentStatus();
+            // 初始化检查
+            checkServerStatus();
         });
     </script>
 </body>
